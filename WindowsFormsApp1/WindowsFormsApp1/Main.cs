@@ -11,32 +11,13 @@ using System.Windows.Forms;
 
 namespace WindowsFormsApp1
 {
-    public partial class Form1 : Form
+    public partial class Main : Form
     {
-        private FileSystemWatcher watcher = new FileSystemWatcher();
-
-        public Form1()
+        private IFolderMonitor folderMonitor;
+        public Main()
         {
             InitializeComponent();
             SetAccess("Users", Application.StartupPath);
-            //watcher.Created += Watcher_Created;
-            //watcher.Error += Watcher_Error;
-
-        }
-
-        private void Watcher_Error(object sender, ErrorEventArgs e)
-        {
-            Watcher(folderBrowserDialog1.SelectedPath, "*.*");
-        }
-
-        private void Watcher(string filepath, string fileFilter)
-        {
-            ClearAllEvents(watcher, "Created");
-            watcher.Path = filepath;
-            watcher.Filter = fileFilter;
-            watcher.EnableRaisingEvents = true;
-            watcher.NotifyFilter = (NotifyFilters.FileName);
-            watcher.IncludeSubdirectories = true;
         }
         /// <summary>
         /// 为指定用户组，授权目录指定完全访问权限
@@ -78,72 +59,6 @@ namespace WindowsFormsApp1
 
             return true;
         }
-        int count = 0;
-        private void Watcher_Created(object sender, FileSystemEventArgs e)
-        {
-            string value = "";
-            count++;
-            Trace.WriteLine(count);
-            try
-            {
-                using (FileStream stream = new FileStream(e.FullPath, FileMode.Open, FileAccess.Read))
-                {
-                    using (StreamReader streamReader = new StreamReader(stream))
-                    {
-                        value = streamReader.ReadToEnd().Replace('\r', '\n');
-                    }
-                }
-                using (StreamWriter streamWriter = new StreamWriter(File.Open(e.FullPath, FileMode.Truncate)))
-                {
-                    if (!string.IsNullOrEmpty(value))
-                    {
-                        streamWriter.Write(value);
-                    }
-                    streamWriter.Flush();
-                }
-            }
-            catch (System.Exception ex)
-            {
-                MessageBox.Show(e.FullPath);
-            }
-        }
-
-        public static void ClearAllEvents(object objectHasEvents, string eventName)
-        {
-            if (objectHasEvents != null)
-            {
-                try
-                {
-                    EventInfo[] events = objectHasEvents.GetType().GetEvents(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (events != null && events.Length >= 1)
-                    {
-                        int num = 0;
-                        EventInfo eventInfo;
-                        while (true)
-                        {
-                            if (num >= events.Length)
-                            {
-                                return;
-                            }
-                            eventInfo = events[num];
-                            if (eventInfo.Name == eventName)
-                            {
-                                break;
-                            }
-                            num++;
-                        }
-                        FieldInfo field = eventInfo.DeclaringType.GetField(eventName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                        if (field != null)
-                        {
-                            field.SetValue(objectHasEvents, null);
-                        }
-                    }
-                }
-                catch
-                {
-                }
-            }
-        }
         private void TextBox1_MouseClick(object sender, MouseEventArgs e)
         {
             folderBrowserDialog1.Description = "请选择EDI文件所在文件夹";
@@ -155,13 +70,11 @@ namespace WindowsFormsApp1
                     return;
                 }
                 textBox1.Text = folderBrowserDialog1.SelectedPath;
-                //Watcher(folderBrowserDialog1.SelectedPath, "*.*");
-                IFolderMonitor folderMonitor = new FolderMonitor(folderBrowserDialog1.SelectedPath);
+                folderMonitor = new FolderMonitor(folderBrowserDialog1.SelectedPath);
                 folderMonitor.CreateEvent += (path) =>
                 {
+                    //模拟操作监控文件
                     Thread.Sleep(1000);
-                    count++;
-                    Trace.WriteLine(count);
                     string value = "";
                     using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read))
                     {
@@ -200,6 +113,8 @@ namespace WindowsFormsApp1
 
         private readonly System.Threading.Timer del_timer;
         private bool m_flag_del_started = false;
+
+        public bool IsStarted { get; set; }
 
         public event Action<string> CreateEvent;
 
@@ -268,6 +183,13 @@ namespace WindowsFormsApp1
         public void Start()
         {
             fileSystemWatcher.EnableRaisingEvents = true;
+            IsStarted = true;
+        }
+
+        public void Stop()
+        {
+            fileSystemWatcher.EnableRaisingEvents = false;
+            IsStarted = false;
         }
 
         private void OnTimeOut(object state)
